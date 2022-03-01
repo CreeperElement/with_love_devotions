@@ -1,7 +1,11 @@
 import logo from './logo.svg';
 import './App.css';
+import db from './firestore';
 
 function App() {
+  db.collection("devotions").onSnapshot(snapshot => {
+    snapshot.docs.forEach(document => console.log(document.data().body))
+  });
   return (
     <div className="App">
       <header className="App-header">
