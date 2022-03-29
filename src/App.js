@@ -1,14 +1,56 @@
-import logo from './logo.svg';
 import './App.css';
 import db from './firestore';
-import { useState } from 'react';
-import Tabs from './Tabs';
+import { useEffect, useState } from 'react';
+import Tabs from './Tabs/Tabs';
 
 const DEVOTION_METADATA = "devotion-metadata";
 const DEVOTION_CONTENT = "devotion-content";
 
+const devMetaDataRef = db.collection(DEVOTION_METADATA);
+const devContentRef = db.collection(DEVOTION_CONTENT);
 
-/*State
+function App() {
+  const [loading, setLoading] = useState(true);
+  const [metadata, setMetadata] = useState([]);
+  const [content, setContent] = useState({body: ""});
+  const [devotionContent, setDevotionContent] = useState([]);
+
+  useEffect(() => {
+    loadInitialDevotion(devMetaDataRef, setMetadata, setLoading, setContent, setDevotionContent, devotionContent);
+  }, [])
+
+  if (loading) {
+    return (<h1>Loading</h1>);
+  }
+
+  return (
+    <div className="App">
+      <header className="App-header">
+        <div className='notebook'>
+            <span className='book-content'>
+              <p>
+                {content.body}
+              </p>
+            </span>
+            <Tabs 
+              metadata={metadata}
+              onSelect={onSelect(setContent, devotionContent, setDevotionContent)}
+            />
+          </div>
+      </header>
+    </div>
+  );
+}
+
+function onSelect(setContent, devotionContent, setDevotionContent) {
+  return async (documentId) => {
+    const text = await loadDevotionFromDocumentId(documentId, devotionContent, setDevotionContent);
+    console.log(text);
+    setContent(text);
+  }
+}
+
+/*
   metadata: [<document id>] = each id is the same for metadata and content
     {
       id: Document id for the collection. Is the same as the id in the content documents
@@ -19,49 +61,40 @@ const DEVOTION_CONTENT = "devotion-content";
       title: The title of the devotion
     }
   ]
-
 */
-
-
-function App() {
-  const devMetaDataRef = db.collection(DEVOTION_METADATA);
-  const devContentRef = db.collection(DEVOTION_CONTENT);
-  
-  const [metadata, setState] = useState(loadAllDocumentMetadata(devMetaDataRef));
-  
-  console.log(metadata);
-
-  return (
-    <div className="App">
-      <header className="App-header">
-        <div className='notebook'>
-            <span className='book-content'>
-              <p>
-                {getLoremIpsum()}
-              </p>
-            </span>
-            <Tabs />
-          </div>
-      </header>
-    </div>
-  );
-}
-
-function loadAllDocumentMetadata(metadataRef) {
+const loadAllDocumentMetadata = async (metadataRef) => {
   let metadataArray = [];
-  metadataRef.get().then(snapshot => snapshot.docs.forEach(document => {
+  const snapshot = await metadataRef.get();
+  snapshot.docs.forEach(document => {
     const data = document.data();
     metadataArray.push({
       id: document.id,
       publish: data.publish,
       title: data.title
     });
-  }));
+  });
   return metadataArray;
 }
 
-function loadDevotionFromDocumentId() {
+const loadDevotionFromDocumentId = async (id, devotionContent, setDevotionContent) => {
+  if (!devotionContent[id]) {
+    const snapshot = await devContentRef.doc(id).get();
+    const content = snapshot.data();
+    devotionContent[id] = content;
+    setDevotionContent(devotionContent);
+    return content;
+  }
+  return devotionContent[id];
+}
 
+const loadInitialDevotion = async (devMetaDataRef, setMetadata, setLoading, setContent, setDevotionContent, devotionContent) => {
+  const metadataArray = await loadAllDocumentMetadata(devMetaDataRef);
+  const devotionId = metadataArray[0].id;
+  devotionContent = await loadDevotionFromDocumentId(devotionId, devotionContent, setDevotionContent);
+
+  setMetadata(metadataArray);
+  setLoading(false);
+  setContent(devotionContent);
 }
 
 function getLoremIpsum() {
