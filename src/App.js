@@ -1,34 +1,22 @@
-import logo from './logo.svg';
 import './App.css';
 import db from './firestore';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import Tabs from './Tabs/Tabs';
 
 const DEVOTION_METADATA = "devotion-metadata";
 const DEVOTION_CONTENT = "devotion-content";
 
+const devMetaDataRef = db.collection(DEVOTION_METADATA);
+const devContentRef = db.collection(DEVOTION_CONTENT);
 
-/*State
-  metadata: [<document id>] = each id is the same for metadata and content
-    {
-      id: Document id for the collection. Is the same as the id in the content documents
-      publish: {
-        nanoseconds: nanoseconds since 1970
-        seconds: seconds since 1970
-      }
-      title: The title of the devotion
-    }
-  ]
+async function App() {
+  let metadata;
+  useEffect(async () => {
+    metadata = await loadAllDocumentMetadata(devMetaDataRef);
+    await loadDevotionFromDocumentId(metadata[0].id);
+  });
 
-*/
-
-
-function App() {
-  const devMetaDataRef = db.collection(DEVOTION_METADATA);
-  const devContentRef = db.collection(DEVOTION_CONTENT);
-  
-  const [metadata, setState] = useState(loadAllDocumentMetadata(devMetaDataRef));
-  
-  console.log(metadata);
+  const [loadedContent, setState] = useState();
 
   return (
     <div className="App">
@@ -39,33 +27,53 @@ function App() {
                 {getLoremIpsum()}
               </p>
             </span>
-            <span className='tabs'>
-                <button className='note-tab'>Peace From A Lack of Answers</button>
-                <button className='note-tab'>Thy Will Be Done</button>
-                <button className='note-tab'>Who Am I (Not To)</button>
-                <button className='note-tab'>Coming Soon</button>
-            </span>
+            <Tabs 
+              metadata={metadata}
+              onSelect={onSelect(setState)}
+            />
           </div>
       </header>
     </div>
   );
 }
 
-function loadAllDocumentMetadata(metadataRef) {
-  let metadataArray = [];
-  metadataRef.get().then(snapshot => snapshot.docs.forEach(document => {
-    const data = document.data();
-    metadataArray.push({
-      id: document.id,
-      publish: data.publish,
-      title: data.title
+function onSelect(setState) {
+  return (documentId) => {
+    console.log(documentId);
+  }
+}
+
+/*
+  metadata: [<document id>] = each id is the same for metadata and content
+    {
+      id: Document id for the collection. Is the same as the id in the content documents
+      publish: {
+        nanoseconds: nanoseconds since 1970
+        seconds: seconds since 1970
+      }
+      title: The title of the devotion
+    }
+  ]
+*/
+let metadataArray;
+async function loadAllDocumentMetadata(metadataRef) {
+  if (!metadataArray) {
+    metadataArray = [];
+    const snapshot = await metadataRef.get();
+    snapshot.docs.forEach(document => {
+      const data = document.data();
+      metadataArray.push({
+        id: document.id,
+        publish: data.publish,
+        title: data.title
+      });
     });
-  }));
+  }
   return metadataArray;
 }
 
-function loadDevotionFromDocumentId() {
-
+async function loadDevotionFromDocumentId(id) {
+  const snapshot = await devContentRef.doc(id).get();
 }
 
 function getLoremIpsum() {
